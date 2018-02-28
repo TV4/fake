@@ -1,11 +1,12 @@
 defmodule Fake do
+  def pid_to_atom(pid), do: pid |> :erlang.pid_to_list() |> to_string |> String.to_atom()
+
   defmacro __using__(_) do
     quote do
       import Fake
 
       setup do
-        {:ok, registry} = Agent.start(fn -> %{} end)
-        Process.put(:fake_registry, registry)
+        {:ok, registry} = Agent.start(fn -> %{} end, name: pid_to_atom(self()))
 
         on_exit(fn -> Fake.verify(registry) end)
       end
@@ -114,22 +115,24 @@ defmodule Fake do
       end
 
     mfas = mfas(behaviour_module, implemented_functions)
-    state = {:%{}, [], Enum.map(mfas, &{&1, false})}
+    initial_state = {:%{}, [], Enum.map(mfas, &{&1, false})}
 
     quote do
       defmodule unquote(fake_module) do
         @behaviour unquote(behaviour_module)
 
+        @agent_name pid_to_atom(self())
+
         unquote(callbacks(behaviour_module, fake_module))
 
         defoverridable(unquote(behaviour_module))
 
-        Agent.update(Process.get(:fake_registry), fn state ->
-          Map.merge(state, unquote(state))
+        Agent.update(@agent_name, fn state ->
+          Map.merge(state, unquote(initial_state))
         end)
 
         def call(mfa) do
-          Agent.update(Process.get(:fake_registry), fn state ->
+          Agent.update(@agent_name, fn state ->
             Map.put(state, mfa, true)
           end)
         end

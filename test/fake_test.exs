@@ -36,7 +36,7 @@ defmodule FakeTest do
       end
 
     try do
-      Fake.verify(Process.get(:fake_registry))
+      Fake.verify(pid_to_atom(self()))
 
       flunk("Should have failed the test because f/1 was never called")
     rescue
