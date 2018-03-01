@@ -44,12 +44,13 @@ defmodule FakeTest do
       flunk("Should have failed the test because f/1 was never called")
     rescue
       error in [ExUnit.AssertionError] ->
-        assert error.message == """
-               Implemented fake function(s) have not been called:
-                 * Elixir.FakeTest.Original.f(1)
-
-               /Users/behe/Work/tv4/fake/test/fake_test.exs:32:
-               """
+        assert error == %ExUnit.AssertionError{
+                 message: """
+                 Implemented fake function(s) have not been called:
+                   * Elixir.FakeTest.Original.f(1)
+                 """,
+                 expr: "/Users/behe/Work/tv4/fake/test/fake_test.exs:32:"
+               }
 
       error ->
         flunk("Unexpected error: #{inspect(error)}")

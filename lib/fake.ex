@@ -1,4 +1,5 @@
 defmodule Fake do
+  import ExUnit.Assertions
   def pid_to_atom(pid), do: pid |> :erlang.pid_to_list() |> to_string |> String.to_atom()
 
   defmacro __using__(_) do
@@ -17,23 +18,21 @@ defmodule Fake do
     Agent.get(pid, fn state ->
       state
       |> Enum.filter(fn {_, called} -> !called end)
+      |> Keyword.keys()
     end)
     |> case do
       [] ->
         :ok
 
       uncalled ->
-        uncalled =
-          Keyword.keys(uncalled)
-          |> Enum.map(&"  * #{&1}")
-          |> Enum.join("\n")
+        formatted_function_list = uncalled |> Enum.map(&"  * #{&1}") |> Enum.join("\n")
 
-        ExUnit.Assertions.flunk("""
-        Implemented fake function(s) have not been called:
-        #{uncalled}
-
-        #{Exception.format_file_line(context.file, context.line)}
-        """)
+        assert false,
+          message: """
+          Implemented fake function(s) have not been called:
+          #{formatted_function_list}
+          """,
+          expr: Exception.format_file_line(context.file, context.line)
     end
   end
 
