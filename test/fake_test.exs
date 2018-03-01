@@ -36,13 +36,20 @@ defmodule FakeTest do
       end
 
     try do
-      Fake.verify(pid_to_atom(self()))
+      Fake.verify(pid_to_atom(self()), %{
+        file: "/Users/behe/Work/tv4/fake/test/fake_test.exs",
+        line: 32
+      })
 
       flunk("Should have failed the test because f/1 was never called")
     rescue
       error in [ExUnit.AssertionError] ->
-        assert error.message ==
-                 "Implemented fake function(s) have not been called:\n  * Elixir.FakeTest.Original.f(1)"
+        assert error.message == """
+               Implemented fake function(s) have not been called:
+                 * Elixir.FakeTest.Original.f(1)
+
+               /Users/behe/Work/tv4/fake/test/fake_test.exs:32:
+               """
 
       error ->
         flunk("Unexpected error: #{inspect(error)}")

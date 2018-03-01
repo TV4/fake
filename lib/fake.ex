@@ -5,15 +5,15 @@ defmodule Fake do
     quote do
       import Fake
 
-      setup do
+      setup context do
         {:ok, registry} = Agent.start(fn -> %{} end, name: pid_to_atom(self()))
 
-        on_exit(fn -> Fake.verify(registry) end)
+        on_exit(fn -> Fake.verify(registry, context) end)
       end
     end
   end
 
-  def verify(pid) do
+  def verify(pid, context \\ %{}) do
     Agent.get(pid, fn state ->
       state
       |> Enum.filter(fn {_, called} -> !called end)
@@ -28,7 +28,12 @@ defmodule Fake do
           |> Enum.map(&"  * #{&1}")
           |> Enum.join("\n")
 
-        ExUnit.Assertions.flunk("Implemented fake function(s) have not been called:\n#{uncalled}")
+        ExUnit.Assertions.flunk("""
+        Implemented fake function(s) have not been called:
+        #{uncalled}
+
+        #{Exception.format_file_line(context.file, context.line)}
+        """)
     end
   end
 
