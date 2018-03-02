@@ -1,5 +1,4 @@
 defmodule Fake do
-  import ExUnit.Assertions
   def pid_to_atom(pid), do: pid |> :erlang.pid_to_list() |> to_string |> String.to_atom()
 
   defmacro __using__(_) do
@@ -15,6 +14,8 @@ defmodule Fake do
   end
 
   def verify(pid, context \\ %{}) do
+    # IO.inspect(context)
+
     Agent.get(pid, fn state ->
       state
       |> Enum.filter(fn {_, called} -> !called end)
@@ -25,30 +26,43 @@ defmodule Fake do
         :ok
 
       uncalled ->
-        formatted_function_list = uncalled |> Enum.map(&"  * #{&1}") |> Enum.join("\n")
+        errors =
+          uncalled
+          |> Enum.map(fn {name, line} ->
+            [m, f, a] = Regex.run(~r/(.*)\.(.*)\((.*)\)/, name, capture: :all_but_first)
+            m = String.to_atom(m)
+            f = String.to_atom(f)
+            a = a |> String.split(",") |> length
 
-        assert false,
-          message: """
-          Implemented fake function(s) have not been called:
-          #{formatted_function_list}
-          """,
-          expr: Exception.format_file_line(context.file, context.line)
+            {:error,
+             %ExUnit.AssertionError{
+               message: "Implemented fake function(s) have not been called",
+               expr: name
+             },
+             [
+               {m, f, a,
+                [
+                  file: Path.relative_to(context.file, File.cwd!()),
+                  line: line
+                ]}
+             ]}
+          end)
+
+        raise ExUnit.MultiError, errors: errors
     end
   end
 
-  def mfas(behaviour_module, implemented_functions) do
-    implemented_functions
-    |> Enum.map(fn {_, _, [{fun, _, args}, _]} ->
-      "#{behaviour_module}.#{Macro.to_string({fun, [], args || []})}"
+  def mfas(behaviour_module, public_functions) do
+    public_functions
+    |> Enum.map(fn {:def, [line: line], [{fun, _, args}, _]} ->
+      {"#{behaviour_module}.#{Macro.to_string({fun, [], args || []})}", line}
     end)
   end
 
   def impl(behaviour_module) do
-    Stream.repeatedly(fn ->
-      quote do
-        @impl unquote(behaviour_module)
-      end
-    end)
+    quote do
+      @impl unquote(behaviour_module)
+    end
   end
 
   def fake_module(behaviour_module) do
@@ -77,48 +91,68 @@ defmodule Fake do
     end)
   end
 
-  def decorate(behaviour_module, functions) do
-    Enum.map(functions, fn {:def, context, [{fun, fc, args}, [do: body]]} ->
-      {:def, context,
-       [
-         {fun, fc, args},
-         [
-           do:
-             {:__block__, [],
-              [
-                {:call, [], ["#{behaviour_module}.#{Macro.to_string({fun, [], args || []})}"]},
-                body
-              ]}
-         ]
-       ]}
+  # Decorate expressions containing functions with @impl behaviour_module
+  # Keep other expressions as is
+  defp decorate(behaviour_module, expressions) do
+    Enum.flat_map(expressions, fn
+      public_function = {:def, context, [{fun, fc, args}, [do: body]]} ->
+        [
+          impl(behaviour_module),
+          {:def, context,
+           [
+             {fun, fc, args},
+             [
+               do:
+                 {:__block__, [],
+                  [
+                    {:call, [], mfas(behaviour_module, [public_function])},
+                    body
+                  ]}
+             ]
+           ]}
+        ]
+
+      otherwise ->
+        [otherwise]
+    end)
+  end
+
+  def public_functions(functions) do
+    Enum.filter(functions, fn
+      {:def, _, _} -> true
+      _ -> false
     end)
   end
 
   defmacro fake(behaviour, do: code) do
     behaviour_module = Macro.expand(behaviour, __CALLER__)
     fake_module = fake_module(behaviour_module)
-    impl = impl(behaviour_module)
 
-    {code, implemented_functions} =
+    {code, functions} =
       case code do
         nil ->
           {nil, []}
 
-        {:__block__, context, implemented_functions} ->
+        {:__block__, context, expressions} ->
+          public_functions = public_functions(expressions)
+
           {
             {
               :__block__,
               context,
-              Enum.zip(impl, decorate(behaviour_module, implemented_functions))
+              decorate(behaviour_module, expressions)
             },
-            implemented_functions
+            public_functions
           }
 
-        function ->
-          {{:__block__, [], Enum.zip(impl, decorate(behaviour_module, [function]))}, [function]}
+        expression ->
+          expressions = [expression]
+          public_functions = public_functions(expressions)
+
+          {{:__block__, [], decorate(behaviour_module, expressions)}, public_functions}
       end
 
-    mfas = mfas(behaviour_module, implemented_functions)
+    mfas = mfas(behaviour_module, functions)
     initial_state = {:%{}, [], Enum.map(mfas, &{&1, false})}
 
     quote do
