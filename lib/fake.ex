@@ -29,10 +29,10 @@ defmodule Fake do
         errors =
           uncalled
           |> Enum.map(fn {name, line} ->
-            [m, f, a] = Regex.run(~r/(.*)\.(.*)\((.*)\)/, name, capture: :all_but_first)
-            m = String.to_atom(m)
+            [m, f, a] = Regex.run(~r/(.*)\.(.*)\/(.*)/, name, capture: :all_but_first)
+            m = String.to_atom("Elixir.#{m}")
             f = String.to_atom(f)
-            a = a |> String.split(",") |> length
+            a = String.to_integer(a)
 
             {:error,
              %ExUnit.AssertionError{
@@ -55,7 +55,7 @@ defmodule Fake do
   def mfas(behaviour_module, public_functions) do
     public_functions
     |> Enum.map(fn {:def, [line: line], [{fun, _, args}, _]} ->
-      {"#{behaviour_module}.#{Macro.to_string({fun, [], args || []})}", line}
+      {Exception.format_mfa(behaviour_module, fun, length(args)), line}
     end)
   end
 

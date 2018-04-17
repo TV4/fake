@@ -75,7 +75,7 @@ defmodule FakeTest do
                  errors: [
                    {:error,
                     %ExUnit.AssertionError{
-                      expr: "Elixir.FakeTest.Original.my_function(1)",
+                      expr: "FakeTest.Original.my_function/1",
                       message: "Implemented fake function(s) have not been called"
                     },
                     [{FakeTest.Original, :my_function, 1, [file: "test/fake_test.exs", line: 59]}]}
