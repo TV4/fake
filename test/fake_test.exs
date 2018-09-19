@@ -62,7 +62,7 @@ defmodule FakeTest do
     try do
       Fake.verify(pid_to_atom(self()), %{
         case: FakeTest,
-        file: "/Users/behe/Work/tv4/fake/test/fake_test.exs",
+        file: "test/fake_test.exs",
         line: 32,
         module: FakeTest,
         test: :"test error when Fake.verify/1 is called unless the fake function has been called"
