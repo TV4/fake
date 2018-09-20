@@ -14,8 +14,6 @@ defmodule Fake do
   end
 
   def verify(pid, context \\ %{}) do
-    # IO.inspect(context)
-
     Agent.get(pid, fn state ->
       state
       |> Enum.filter(fn {_, called} -> !called end)
@@ -52,20 +50,20 @@ defmodule Fake do
     end
   end
 
-  def mfas(behaviour_module, public_functions) do
+  defp mfas(behaviour_module, public_functions) do
     public_functions
     |> Enum.map(fn {:def, [line: line], [{fun, _, args}, _]} ->
       {Exception.format_mfa(behaviour_module, fun, length(args)), line}
     end)
   end
 
-  def impl(behaviour_module) do
+  defp impl(behaviour_module) do
     quote do
       @impl unquote(behaviour_module)
     end
   end
 
-  def fake_module(behaviour_module) do
+  defp fake_module(behaviour_module) do
     random_stuff =
       :crypto.strong_rand_bytes(12)
       |> :erlang.bitstring_to_list()
@@ -76,7 +74,7 @@ defmodule Fake do
     :"#{behaviour_module}.Fake.#{random_stuff}"
   end
 
-  def callbacks(behaviour_module, fake_module) do
+  defp callbacks(behaviour_module, fake_module) do
     behaviour_module.behaviour_info(:callbacks)
     |> Enum.map(fn {callback, arity} ->
       args =
@@ -91,8 +89,8 @@ defmodule Fake do
     end)
   end
 
-  # Decorate expressions containing functions with @impl behaviour_module
-  # Keep other expressions as is
+  # Decorate expressions containing functions with @impl behaviour_module.
+  # Keep other expressions as is.
   defp decorate(behaviour_module, expressions) do
     Enum.flat_map(expressions, fn
       public_function = {:def, context, [{fun, fc, args}, [do: body]]} ->
@@ -117,7 +115,7 @@ defmodule Fake do
     end)
   end
 
-  def public_functions(functions) do
+  defp public_functions(functions) do
     Enum.filter(functions, fn
       {:def, _, _} -> true
       _ -> false
@@ -169,7 +167,7 @@ defmodule Fake do
           Map.merge(state, unquote(initial_state))
         end)
 
-        def call(mfa) do
+        defp call(mfa) do
           Agent.update(@agent_name, fn state ->
             Map.put(state, mfa, true)
           end)
