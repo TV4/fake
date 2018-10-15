@@ -6,6 +6,9 @@ defmodule FakeTest do
   defmodule Original do
     @callback my_function(x :: integer()) :: atom()
     def my_function(1), do: :my_function
+
+    @callback my_zero_arity_function() :: atom()
+    def my_zero_arity_function, do: :my_zero_arity_function
   end
 
   defmodule Helper do
@@ -43,6 +46,15 @@ defmodule FakeTest do
     assert module.my_function(1) == :my_private_function
   end
 
+  test "a fake may define a zero arity function" do
+    module =
+      fake Original do
+        def my_zero_arity_function, do: :ok
+      end
+
+    assert module.my_zero_arity_function() == :ok
+  end
+
   test "a fake may import a helper function" do
     module =
       fake Original do
@@ -71,16 +83,16 @@ defmodule FakeTest do
       flunk("Should have failed the test because f/1 was never called")
     rescue
       error in [ExUnit.MultiError] ->
-        assert error == %ExUnit.MultiError{
+        assert %ExUnit.MultiError{
                  errors: [
                    {:error,
                     %ExUnit.AssertionError{
                       expr: "FakeTest.Original.my_function/1",
                       message: "Implemented fake function(s) have not been called"
                     },
-                    [{FakeTest.Original, :my_function, 1, [file: "test/fake_test.exs", line: 59]}]}
+                    [{FakeTest.Original, :my_function, 1, [file: "test/fake_test.exs", line: _]}]}
                  ]
-               }
+               } = error
 
       error ->
         flunk("Unexpected error: #{inspect(error)}")

@@ -53,7 +53,13 @@ defmodule Fake do
   defp mfas(behaviour_module, public_functions) do
     public_functions
     |> Enum.map(fn {:def, [line: line], [{fun, _, args}, _]} ->
-      {Exception.format_mfa(behaviour_module, fun, length(args)), line}
+      arg_length =
+        case args do
+          nil -> 0
+          args -> length(args)
+        end
+
+      {Exception.format_mfa(behaviour_module, fun, arg_length), line}
     end)
   end
 
